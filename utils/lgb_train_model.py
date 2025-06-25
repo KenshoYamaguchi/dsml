@@ -21,7 +21,7 @@ class LightGBMTrainer:
             'bagging_fraction': 0.8,
             'bagging_freq': 5,
             'min_child_samples': 20,
-            'num_iterations': 1000,
+            'num_iterations': 300,
             'random_state': 42,
             'verbose': -1
         }
@@ -33,10 +33,10 @@ class LightGBMTrainer:
             'feature_fraction': [0.6, 0.7, 0.8, 0.9],
             'bagging_fraction': [0.6, 0.7, 0.8, 0.9],
             'min_child_samples': [10, 20, 30, 50],
-            'num_iterations': [500, 1000, 1500]
+            'num_iterations': [100, 300, 500]
         }
     
-    def train_with_hyperparameter_tuning(self, X_train, y_train, X_val=None, y_val=None, n_iter=20):
+    def train_with_hyperparameter_tuning(self, X_train, y_train, X_val=None, y_val=None, n_iter=5):
         # Base model for hyperparameter tuning
         base_model = lgb.LGBMRegressor(**self.get_default_params())
         
@@ -78,12 +78,12 @@ class LightGBMTrainer:
             valid_names.append('eval')
         
         # Training parameters
-        num_boost_round = params.pop('num_iterations', 1000)
+        num_boost_round = params.pop('num_iterations', 300)
         
         # Callbacks
         callbacks = [
             lgb.early_stopping(stopping_rounds=50, verbose=False),
-            lgb.log_evaluation(period=0)  # Disable logging
+            lgb.log_evaluation(period=100)  # Show progress every 100 iterations
         ]
         
         # Train

@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>機械学習</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">ML Analysis System</a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="{{ url_for('analyze_page') }}">データ分析</a>
+                <a class="nav-link active" href="{{ url_for('train_page') }}">学習</a>
+                <a class="nav-link" href="{{ url_for('predict_page') }}">予測</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-warning">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% if not training_complete %}
+        <!-- Model Training Section -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3>機械学習モデル学習</h3>
+            </div>
+            <div class="card-body">
+                {% if not columns %}
+                <div class="alert alert-info">
+                    <h5>データをアップロードしてください</h5>
+                    <p>機械学習を開始するには、まず<a href="{{ url_for('analyze_page') }}">データ分析ページ</a>でデータをアップロードしてください。</p>
+                </div>
+                {% else %}
+                <form action="{{ url_for('train_model') }}" method="post">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label for="target_column" class="form-label">目的変数 (予測したい列)</label>
+                            <select name="target_column" id="target_column" class="form-select" required>
+                                <option value="">選択してください</option>
+                                {% for column in columns %}
+                                    <option value="{{ column }}">{{ column }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="feature_columns" class="form-label">説明変数 (複数選択可)</label>
+                            <select name="feature_columns" id="feature_columns" class="form-select" multiple required size="15" style="height: 300px;">
+                                {% for column in columns %}
+                                    <option value="{{ column }}">{{ column }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">Ctrlキーを押しながらクリックで複数選択</div>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-success btn-lg">学習実行</button>
+                    </div>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <!-- Training Results Section -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3>学習結果</h3>
+                <a href="{{ url_for('download_training_results') }}" class="btn btn-outline-primary">
+                    <i class="fas fa-download"></i> 結果をダウンロード
+                </a>
+            </div>
+            <div class="card-body">
+                <!-- Performance Metrics -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <h5>RMSE</h5>
+                            <p class="metric-value">{{ "%.4f"|format(metrics.rmse) }}</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <h5>MAE</h5>
+                            <p class="metric-value">{{ "%.4f"|format(metrics.mae) }}</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <h5>R²スコア</h5>
+                            <p class="metric-value">{{ "%.4f"|format(metrics.r2) }}</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <h5>MSE</h5>
+                            <p class="metric-value">{{ "%.4f"|format(metrics.mse) }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Plots Section -->
+                <div class="row">
+                    {% if plots.prediction_plot %}
+                    <div class="col-md-6 mb-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5>予測値 vs 実測値</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="predictionPlot"></div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if plots.residual_plot %}
+                    <div class="col-md-6 mb-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5>残差プロット</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="residualPlot"></div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if plots.feature_importance_plot %}
+                    <div class="col-md-12 mb-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5>特徴量重要度</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="featureImportancePlot"></div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if plots.shap_summary %}
+                    <div class="col-md-6 mb-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5>SHAP要約プロット</h5>
+                            </div>
+                            <div class="card-body">
+                                <img src="data:image/png;base64,{{ plots.shap_summary }}" class="img-fluid" alt="SHAP Summary Plot">
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if plots.shap_waterfall %}
+                    <div class="col-md-6 mb-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5>SHAP Waterfall プロット</h5>
+                            </div>
+                            <div class="card-body">
+                                <img src="data:image/png;base64,{{ plots.shap_waterfall }}" class="img-fluid" alt="SHAP Waterfall Plot">
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="text-center mt-4">
+                    <a href="{{ url_for('predict_page') }}" class="btn btn-primary btn-lg">予測画面に進む</a>
+                    <a href="{{ url_for('train_page') }}" class="btn btn-secondary btn-lg ms-2">新しいモデルを学習</a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='scripts.js') }}"></script>
+    
+    {% if training_complete and plots %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Function to safely render a plot
+            function renderPlot(plotId, plotData) {
+                try {
+                    if (!plotData || !document.getElementById(plotId)) {
+                        return;
+                    }
+                    
+                    let parsedData;
+                    if (typeof plotData === 'string') {
+                        parsedData = JSON.parse(plotData);
+                    } else {
+                        parsedData = plotData;
+                    }
+                    
+                    if (parsedData.data && parsedData.layout) {
+                        Plotly.newPlot(plotId, parsedData.data, parsedData.layout, {responsive: true});
+                    } else if (Array.isArray(parsedData)) {
+                        Plotly.newPlot(plotId, parsedData, {responsive: true}, {responsive: true});
+                    } else {
+                        Plotly.newPlot(plotId, parsedData, {responsive: true}, {responsive: true});
+                    }
+                } catch (error) {
+                    console.error(`Error rendering ${plotId}:`, error);
+                    const plotDiv = document.getElementById(plotId);
+                    if (plotDiv) {
+                        plotDiv.innerHTML = '<div class="alert alert-warning">グラフの表示中にエラーが発生しました</div>';
+                    }
+                }
+            }
+            
+            {% if plots.prediction_plot %}
+            renderPlot('predictionPlot', {{ plots.prediction_plot|safe }});
+            {% endif %}
+            
+            {% if plots.residual_plot %}
+            renderPlot('residualPlot', {{ plots.residual_plot|safe }});
+            {% endif %}
+            
+            {% if plots.feature_importance_plot %}
+            renderPlot('featureImportancePlot', {{ plots.feature_importance_plot|safe }});
+            {% endif %}
+        });
+    </script>
+    {% endif %}
+</body>
+</html>

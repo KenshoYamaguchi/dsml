@@ -1,0 +1,75 @@
+データ分析・機械学習を簡単に行えるwebシステムを作る
+
+
+分析方法
+
+今回はLightGBM
+
+
+
+インターフェース
+
+・トップ画面
+画面からcsvかxlsxファイルをアップロードする。
+ヘッダーを読み込むことでプルダウンメニューにてデータを可視化できる
+デフォルトで出すものは各変数のヒストグラム、平均値、分散。
+他のグラフも選択できるようにする。　2つの変数を選んで散布図を描く　など
+tableauと同じようなインターフェースにする。
+
+
+・学習・分析フェーズ
+ファイルのヘッダーを読み込み、プルダウンメニューにて目的変数を選択する。説明変数もプルダウンメニューにて複数選択する。
+欠損値の補完・データ分割はシステムにて自動で行う。「学習実行」ボタンにて学習を実行する。ハイパーパラメーターのチューニングもシステムにて自動で行う。
+モデルの精度(RMSE)やSHAP、特徴量重要度をグラフで表示する。
+
+
+・予測フェーズ
+目的変数のないCSV、XLSXをアップロードすると、予測結果をはじき出し、SHAPなども表示する。
+
+
+
+
+
+使うライブラリ
+lightgbm shap pandas numpy scikit-learn matplotlib japanize-matplotlib tensorflow plotly flask
+
+
+
+
+mlapp/
+├── app.py                     # Flaskアプリのエントリーポイント
+├── config.py                 # 設定ファイル（アップロード先やパス設定）
+├── requirements.txt          # 使用ライブラリ一覧
+├── model/                    # 学習済みモデルや前処理器の保存先
+│   └── model.pkl
+│   └── preprocessor.pkl
+├── static/                   # CSSやJavaScriptなどの静的ファイル
+│   ├── style.css
+│   └── scripts.js
+├── templates/                # HTMLテンプレート
+│   ├── index.html            # トップ画面（データアップロードなど）
+│   ├── analyze.html          # 学習・分析結果表示
+│   └── predict.html          # 予測結果表示
+├── utils/                    # 補助関数・モジュール群
+│   ├── preprocessing.py      # 欠損値補完・前処理系
+│   ├── train_model.py        # モデル学習
+│   ├── evaluate.py           # RMSE・SHAP等の評価指標計算
+│   └── predict.py            # モデルを使った予測処理
+└── uploads/                  # アップロードされたCSV/XLSX一時保存用
+
+
+
+
+
+📝 各ファイル・フォルダの役割
+フォルダ / ファイル	役割
+app.py	Flaskアプリ全体のルーティングと画面制御の中心。
+config.py	UPLOAD_FOLDERなど、パスや設定定義。
+requirements.txt	使用するライブラリを記述（pip freezeで生成可）
+model/	モデルと前処理器をjoblibやpickleで保存
+static/	CSSやJS（データ可視化の補助用）
+templates/	各HTML画面。Jinjaテンプレートを利用
+utils/	学習・予測・評価・前処理などをモジュール化
+uploads/	アップロードされたファイルの一時保存先（自動削除も可）
+
+

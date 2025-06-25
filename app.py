@@ -8,7 +8,7 @@ from werkzeug.utils import secure_filename
 
 from config import Config
 from utils.preprocessing import DataPreprocessor
-from utils.train_model import LightGBMTrainer
+from utils.lgb_train_model import LightGBMTrainer
 from utils.evaluate import ModelEvaluator
 from utils.predict import PredictionService
 
@@ -25,6 +25,25 @@ target_column = None
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/analyze')
+def analyze_page():
+    global current_data
+    if current_data is not None:
+        preprocessor_temp = DataPreprocessor()
+        stats = preprocessor_temp.get_basic_statistics(current_data)
+        return render_template('analyze.html', 
+                             columns=current_data.columns.tolist(),
+                             data_preview=current_data.head().to_html(classes='table table-striped'),
+                             stats=stats,
+                             data_shape=current_data.shape)
+    return redirect(url_for('index'))
+
+@app.route('/train')
+def train_page():
+    global current_data
+    columns = current_data.columns.tolist() if current_data is not None else None
+    return render_template('train.html', columns=columns)
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -55,11 +74,7 @@ def upload_file():
             # Get basic statistics
             stats = preprocessor_temp.get_basic_statistics(current_data)
             
-            return render_template('analyze.html', 
-                                 columns=current_data.columns.tolist(),
-                                 data_preview=current_data.head().to_html(classes='table table-striped'),
-                                 stats=stats,
-                                 data_shape=current_data.shape)
+            return redirect(url_for('analyze_page'))
         except Exception as e:
             flash(f'ファイルの読み込みに失敗しました: {str(e)}')
             return redirect(url_for('index'))
@@ -86,14 +101,40 @@ def visualize_data():
                 # Categorical data - value counts
                 value_counts = current_data[column].value_counts().head(20)
                 fig = px.bar(x=value_counts.index, y=value_counts.values, 
-                           labels={'x': column, 'y': '頻度'})
+                           labels={'x': column, 'y': '頻度'}, 
+                           title=f'{column}の分布')
+                fig.update_layout(
+                    xaxis_title=column,
+                    yaxis_title='頻度',
+                    height=400,
+                    margin=dict(l=50, r=50, t=50, b=50)
+                )
             else:
                 # Numerical data - histogram
-                fig = px.histogram(current_data, x=column, nbins=30)
+                fig = px.histogram(current_data, x=column, nbins=30, title=f'{column}の分布')
+                # Set appropriate range based on data distribution
+                q1 = current_data[column].quantile(0.01)
+                q99 = current_data[column].quantile(0.99)
+                fig.update_layout(
+                    xaxis_title=column,
+                    yaxis_title='頻度',
+                    height=400,
+                    margin=dict(l=50, r=50, t=50, b=50),
+                    xaxis=dict(range=[q1, q99])
+                )
             
         elif chart_type == 'box':
             if current_data[column].dtype not in ['object']:
-                fig = px.box(current_data, y=column)
+                fig = px.box(current_data, y=column, title=f'{column}の箱ひげ図')
+                # Set appropriate range based on data distribution
+                q1 = current_data[column].quantile(0.01)
+                q99 = current_data[column].quantile(0.99)
+                fig.update_layout(
+                    yaxis_title=column,
+                    height=400,
+                    margin=dict(l=50, r=50, t=50, b=50),
+                    yaxis=dict(range=[q1, q99])
+                )
             else:
                 return jsonify({'error': 'カテゴリカルデータには箱ひげ図は使用できません'})
         
@@ -101,12 +142,54 @@ def visualize_data():
             x_column = request.json.get('x_column')
             y_column = request.json.get('y_column')
             if x_column and y_column:
-                fig = px.scatter(current_data, x=x_column, y=y_column)
+                fig = px.scatter(current_data, x=x_column, y=y_column, 
+                               title=f'{x_column} vs {y_column}')
+                fig.update_layout(
+                    xaxis_title=x_column,
+                    yaxis_title=y_column,
+                    height=400,
+                    margin=dict(l=50, r=50, t=50, b=50)
+                )
             else:
                 return jsonify({'error': 'X軸とY軸の列を指定してください'})
         
-        graphJSON = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
-        return jsonify({'plot': graphJSON})
+        elif chart_type == 'line':
+            if current_data[column].dtype not in ['object']:
+                fig = px.line(x=current_data.index, y=current_data[column], 
+                             title=f'{column}の時系列プロット')
+                fig.update_layout(
+                    xaxis_title='インデックス',
+                    yaxis_title=column,
+                    height=400,
+                    margin=dict(l=50, r=50, t=50, b=50)
+                )
+            else:
+                return jsonify({'error': 'カテゴリカルデータには線グラフは使用できません'})
+        
+        elif chart_type == 'violin':
+            if current_data[column].dtype not in ['object']:
+                fig = px.violin(current_data, y=column, title=f'{column}のバイオリンプロット')
+                fig.update_layout(
+                    yaxis_title=column,
+                    height=400,
+                    margin=dict(l=50, r=50, t=50, b=50)
+                )
+            else:
+                return jsonify({'error': 'カテゴリカルデータにはバイオリンプロットは使用できません'})
+        
+        # Convert to JSON using Plotly's to_json method for better compatibility
+        try:
+            graphJSON = fig.to_json()
+            return jsonify({'plot': graphJSON})
+        except Exception as json_error:
+            print(f"JSON encoding error: {str(json_error)}")
+            # Fallback to old method
+            try:
+                graphJSON = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+                return jsonify({'plot': graphJSON})
+            except Exception as fallback_error:
+                print(f"Fallback JSON encoding error: {str(fallback_error)}")
+                return jsonify({'error': f'グラフのJSON変換に失敗しました: {str(fallback_error)}'})
         
     except Exception as e:
         return jsonify({'error': f'可視化に失敗しました: {str(e)}'})
@@ -150,12 +233,23 @@ def train_model():
         # Convert plots to JSON for frontend
         plots_json = {}
         for plot_name, plot_obj in evaluation_report['plots'].items():
-            if plot_obj is not None and hasattr(plot_obj, 'to_json'):
-                plots_json[plot_name] = json.dumps(plot_obj, cls=plotly.utils.PlotlyJSONEncoder)
-            elif isinstance(plot_obj, str):  # Base64 image
-                plots_json[plot_name] = plot_obj
+            if plot_obj is not None:
+                if hasattr(plot_obj, 'to_json'):
+                    try:
+                        plots_json[plot_name] = plot_obj.to_json()
+                    except Exception as json_error:
+                        print(f"Error converting {plot_name} to JSON: {str(json_error)}")
+                        try:
+                            plots_json[plot_name] = json.dumps(plot_obj, cls=plotly.utils.PlotlyJSONEncoder)
+                        except Exception as fallback_error:
+                            print(f"Fallback error for {plot_name}: {str(fallback_error)}")
+                            plots_json[plot_name] = None
+                elif isinstance(plot_obj, str):  # Base64 image
+                    plots_json[plot_name] = plot_obj
+                else:
+                    plots_json[plot_name] = None
         
-        return render_template('analyze.html',
+        return render_template('train.html',
                              training_complete=True,
                              metrics=evaluation_report['metrics'],
                              plots=plots_json,
@@ -195,10 +289,21 @@ def predict():
             # Convert plots to JSON for frontend
             plots_json = {}
             for plot_name, plot_obj in prediction_report['plots'].items():
-                if plot_obj is not None and hasattr(plot_obj, 'to_json'):
-                    plots_json[plot_name] = json.dumps(plot_obj, cls=plotly.utils.PlotlyJSONEncoder)
-                elif isinstance(plot_obj, str):  # Base64 image
-                    plots_json[plot_name] = plot_obj
+                if plot_obj is not None:
+                    if hasattr(plot_obj, 'to_json'):
+                        try:
+                            plots_json[plot_name] = plot_obj.to_json()
+                        except Exception as json_error:
+                            print(f"Error converting {plot_name} to JSON: {str(json_error)}")
+                            try:
+                                plots_json[plot_name] = json.dumps(plot_obj, cls=plotly.utils.PlotlyJSONEncoder)
+                            except Exception as fallback_error:
+                                print(f"Fallback error for {plot_name}: {str(fallback_error)}")
+                                plots_json[plot_name] = None
+                    elif isinstance(plot_obj, str):  # Base64 image
+                        plots_json[plot_name] = plot_obj
+                    else:
+                        plots_json[plot_name] = None
             
             return render_template('predict.html',
                                  prediction_complete=True,
@@ -219,6 +324,46 @@ def download_predictions():
     # For now, just redirect back
     flash('ダウンロード機能は未実装です')
     return redirect(url_for('predict_page'))
+
+@app.route('/download_training_results')
+def download_training_results():
+    global model, preprocessor, feature_columns, target_column
+    
+    if model is None:
+        flash('学習済みモデルがありません')
+        return redirect(url_for('train_page'))
+    
+    try:
+        # Create a summary report
+        evaluator = ModelEvaluator(model, None, None, feature_names=feature_columns)
+        
+        # Generate downloadable content
+        import io
+        import csv
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write header
+        writer.writerow(['Model Training Results'])
+        writer.writerow(['Target Variable', target_column])
+        writer.writerow(['Feature Variables'] + feature_columns)
+        writer.writerow([])
+        
+        # Would add metrics here
+        writer.writerow(['Metrics will be added here'])
+        
+        output.seek(0)
+        
+        from flask import Response
+        return Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={'Content-Disposition': 'attachment; filename=training_results.csv'}
+        )
+        
+    except Exception as e:
+        flash(f'ダウンロードに失敗しました: {str(e)}')
+        return redirect(url_for('train_page'))
 
 @app.errorhandler(413)
 def too_large(e):

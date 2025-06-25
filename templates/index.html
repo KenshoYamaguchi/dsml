@@ -12,7 +12,8 @@
         <div class="container">
             <a class="navbar-brand" href="{{ url_for('index') }}">ML Analysis System</a>
             <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="{{ url_for('index') }}">データ分析</a>
+                <a class="nav-link active" href="{{ url_for('index') }}">データ分析</a>
+                <a class="nav-link" href="{{ url_for('train_page') }}">学習</a>
                 <a class="nav-link" href="{{ url_for('predict_page') }}">予測</a>
             </div>
         </div>

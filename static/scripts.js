@@ -67,10 +67,34 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data.error) {
                     plotDiv.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
                 } else {
-                    // Clear the div and plot the graph
-                    plotDiv.innerHTML = '';
-                    const plotData = JSON.parse(data.plot);
-                    Plotly.newPlot('plotDiv', plotData.data, plotData.layout);
+                    try {
+                        // Clear the div and plot the graph
+                        plotDiv.innerHTML = '';
+                        
+                        // Parse the plot data - it should already be a proper Plotly object
+                        let plotData;
+                        if (typeof data.plot === 'string') {
+                            plotData = JSON.parse(data.plot);
+                        } else {
+                            plotData = data.plot;
+                        }
+                        
+                        // Ensure we have the right structure for Plotly
+                        if (plotData.data && plotData.layout) {
+                            // Standard Plotly format with data and layout
+                            Plotly.newPlot('plotDiv', plotData.data, plotData.layout, {responsive: true});
+                        } else if (Array.isArray(plotData)) {
+                            // Data array only, use default layout
+                            Plotly.newPlot('plotDiv', plotData, {}, {responsive: true});
+                        } else {
+                            // Try to plot directly assuming it's a complete figure
+                            Plotly.newPlot('plotDiv', plotData, {}, {responsive: true});
+                        }
+                    } catch (plotError) {
+                        console.error('Plot rendering error:', plotError);
+                        console.log('Plot data:', data.plot);
+                        plotDiv.innerHTML = `<div class="alert alert-danger">グラフの描画に失敗しました: ${plotError.message}</div>`;
+                    }
                 }
             })
             .catch(error => {

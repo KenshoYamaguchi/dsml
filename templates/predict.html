@@ -13,8 +13,9 @@
         <div class="container">
             <a class="navbar-brand" href="{{ url_for('index') }}">ML Analysis System</a>
             <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="{{ url_for('index') }}">データ分析</a>
-                <a class="nav-link" href="{{ url_for('predict_page') }}">予測</a>
+                <a class="nav-link" href="{{ url_for('analyze_page') }}">データ分析</a>
+                <a class="nav-link" href="{{ url_for('train_page') }}">学習</a>
+                <a class="nav-link active" href="{{ url_for('predict_page') }}">予測</a>
             </div>
         </div>
     </nav>
@@ -172,9 +173,34 @@
     
     {% if prediction_complete and plots %}
     <script>
-        {% if plots.prediction_distribution %}
-        Plotly.newPlot('predictionDistPlot', {{ plots.prediction_distribution|safe }});
-        {% endif %}
+        document.addEventListener('DOMContentLoaded', function() {
+            {% if plots.prediction_distribution %}
+            try {
+                // Parse the plot data
+                let plotData;
+                const rawData = {{ plots.prediction_distribution|safe }};
+                
+                if (typeof rawData === 'string') {
+                    plotData = JSON.parse(rawData);
+                } else {
+                    plotData = rawData;
+                }
+                
+                // Create the plot with proper error handling
+                if (plotData && document.getElementById('predictionDistPlot')) {
+                    Plotly.newPlot('predictionDistPlot', plotData.data || plotData, 
+                                  plotData.layout || {responsive: true}, 
+                                  {responsive: true});
+                }
+            } catch (error) {
+                console.error('Error rendering prediction distribution plot:', error);
+                const plotDiv = document.getElementById('predictionDistPlot');
+                if (plotDiv) {
+                    plotDiv.innerHTML = '<div class="alert alert-warning">グラフの表示中にエラーが発生しました</div>';
+                }
+            }
+            {% endif %}
+        });
     </script>
     {% endif %}
 </body>

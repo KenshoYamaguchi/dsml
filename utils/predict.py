@@ -7,7 +7,7 @@ import base64
 from io import BytesIO
 import plotly.graph_objects as go
 from .preprocessing import DataPreprocessor
-from .train_model import LightGBMTrainer
+from .lgb_train_model import LightGBMTrainer
 from .evaluate import ModelEvaluator
 
 class PredictionService:
@@ -101,57 +101,97 @@ class PredictionService:
     def create_shap_summary_plot(self, shap_values, feature_names=None):
         try:
             plt.figure(figsize=(10, 6))
+            
+            # Set matplotlib backend to Agg for server environments
+            import matplotlib
+            matplotlib.use('Agg')
+            
+            # Create SHAP summary plot
             shap.summary_plot(shap_values, feature_names=feature_names, show=False)
             
             # Convert to base64 for web display
             buffer = BytesIO()
-            plt.savefig(buffer, format='png', bbox_inches='tight', dpi=150)
+            plt.savefig(buffer, format='png', bbox_inches='tight', dpi=150, 
+                       facecolor='white', edgecolor='none')
             buffer.seek(0)
             image_base64 = base64.b64encode(buffer.read()).decode()
             plt.close()
+            plt.clf()  # Clear the figure
             
             return image_base64
         except Exception as e:
             print(f"SHAP summary plot creation failed: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            plt.close()  # Ensure figure is closed even on error
             return None
     
     def create_individual_shap_plot(self, shap_values, sample_index=0):
         try:
             plt.figure(figsize=(10, 6))
-            shap.waterfall_plot(shap_values[sample_index], show=False)
+            
+            # Set matplotlib backend to Agg for server environments
+            import matplotlib
+            matplotlib.use('Agg')
+            
+            # Create individual SHAP waterfall plot
+            if sample_index < len(shap_values):
+                shap.waterfall_plot(shap_values[sample_index], show=False)
+            else:
+                # Fallback to first sample if index is out of range
+                shap.waterfall_plot(shap_values[0], show=False)
             
             # Convert to base64 for web display
             buffer = BytesIO()
-            plt.savefig(buffer, format='png', bbox_inches='tight', dpi=150)
+            plt.savefig(buffer, format='png', bbox_inches='tight', dpi=150,
+                       facecolor='white', edgecolor='none')
             buffer.seek(0)
             image_base64 = base64.b64encode(buffer.read()).decode()
             plt.close()
+            plt.clf()  # Clear the figure
             
             return image_base64
         except Exception as e:
             print(f"Individual SHAP plot creation failed: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            plt.close()  # Ensure figure is closed even on error
             return None
     
     def create_prediction_distribution_plot(self, predictions):
-        fig = go.Figure()
-        
-        fig.add_trace(go.Histogram(
-            x=predictions,
-            nbinsx=30,
-            name='Prediction Distribution',
-            marker_color='lightblue',
-            opacity=0.7
-        ))
-        
-        fig.update_layout(
-            title='Distribution of Predictions',
-            xaxis_title='Predicted Values',
-            yaxis_title='Frequency',
-            width=600,
-            height=400
-        )
-        
-        return fig
+        try:
+            fig = go.Figure()
+            
+            # Ensure predictions is a numpy array or list
+            if hasattr(predictions, 'tolist'):
+                pred_values = predictions.tolist()
+            else:
+                pred_values = list(predictions)
+            
+            fig.add_trace(go.Histogram(
+                x=pred_values,
+                nbinsx=min(30, len(pred_values) // 2 + 1),  # Adjust bins based on data size
+                name='Prediction Distribution',
+                marker_color='lightblue',
+                opacity=0.7
+            ))
+            
+            fig.update_layout(
+                title='Distribution of Predictions',
+                xaxis_title='Predicted Values',
+                yaxis_title='Frequency',
+                width=800,
+                height=400,
+                showlegend=False,
+                margin=dict(l=50, r=50, t=50, b=50)
+            )
+            
+            return fig
+        except Exception as e:
+            print(f"Prediction distribution plot creation failed: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return None
     
     def generate_prediction_report(self, file_path=None, df=None):
         if file_path is None and df is None:
