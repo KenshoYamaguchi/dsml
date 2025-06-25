@@ -1,0 +1,11 @@
+flask
+lightgbm
+shap
+pandas
+numpy
+scikit-learn
+matplotlib
+japanize-matplotlib
+openpyxl
+joblib
+plotly
