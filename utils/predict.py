@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 import shap
+import matplotlib
+matplotlib.use('Agg')  # Set backend before importing pyplot
 import matplotlib.pyplot as plt
 import japanize_matplotlib
 import base64

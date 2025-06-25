@@ -371,4 +371,6 @@ def too_large(e):
     return redirect(url_for('index'))
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Only run in debug mode locally, not in production
+    is_production = os.environ.get('WEBSITE_HOSTNAME') is not None
+    app.run(debug=not is_production, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
