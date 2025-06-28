@@ -80,6 +80,18 @@
                 </a>
             </div>
             <div class="card-body">
+                <!-- Model Configuration Info -->
+                <div class="alert alert-info mb-4">
+                    <h6>🎯 モデル設定</h6>
+                    <p class="mb-1"><strong>目的変数:</strong> {{ session.target_column or 'N/A' }}</p>
+                    <p class="mb-0"><strong>説明変数:</strong> 
+                        {% if session.feature_columns %}
+                            {{ session.feature_columns|join(', ') }}
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </p>
+                </div>
                 <!-- Performance Metrics -->
                 <div class="row mb-4">
                     <div class="col-md-3">
@@ -117,7 +129,7 @@
                                 <h5>予測値 vs 実測値</h5>
                             </div>
                             <div class="card-body">
-                                <div id="predictionPlot"></div>
+                                <img src="data:image/png;base64,{{ plots.prediction_plot }}" class="img-fluid" alt="Prediction Plot">
                             </div>
                         </div>
                     </div>
@@ -130,7 +142,7 @@
                                 <h5>残差プロット</h5>
                             </div>
                             <div class="card-body">
-                                <div id="residualPlot"></div>
+                                <img src="data:image/png;base64,{{ plots.residual_plot }}" class="img-fluid" alt="Residual Plot">
                             </div>
                         </div>
                     </div>
@@ -143,7 +155,7 @@
                                 <h5>特徴量重要度</h5>
                             </div>
                             <div class="card-body">
-                                <div id="featureImportancePlot"></div>
+                                <img src="data:image/png;base64,{{ plots.feature_importance_plot }}" class="img-fluid" alt="Feature Importance Plot">
                             </div>
                         </div>
                     </div>
@@ -178,7 +190,7 @@
 
                 <div class="text-center mt-4">
                     <a href="{{ url_for('predict_page') }}" class="btn btn-primary btn-lg">予測画面に進む</a>
-                    <a href="{{ url_for('train_page') }}" class="btn btn-secondary btn-lg ms-2">新しいモデルを学習</a>
+                    <a href="{{ url_for('new_train') }}" class="btn btn-secondary btn-lg ms-2">新しいモデルを学習</a>
                 </div>
             </div>
         </div>
@@ -188,52 +200,5 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='scripts.js') }}"></script>
     
-    {% if training_complete and plots %}
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Function to safely render a plot
-            function renderPlot(plotId, plotData) {
-                try {
-                    if (!plotData || !document.getElementById(plotId)) {
-                        return;
-                    }
-                    
-                    let parsedData;
-                    if (typeof plotData === 'string') {
-                        parsedData = JSON.parse(plotData);
-                    } else {
-                        parsedData = plotData;
-                    }
-                    
-                    if (parsedData.data && parsedData.layout) {
-                        Plotly.newPlot(plotId, parsedData.data, parsedData.layout, {responsive: true});
-                    } else if (Array.isArray(parsedData)) {
-                        Plotly.newPlot(plotId, parsedData, {responsive: true}, {responsive: true});
-                    } else {
-                        Plotly.newPlot(plotId, parsedData, {responsive: true}, {responsive: true});
-                    }
-                } catch (error) {
-                    console.error(`Error rendering ${plotId}:`, error);
-                    const plotDiv = document.getElementById(plotId);
-                    if (plotDiv) {
-                        plotDiv.innerHTML = '<div class="alert alert-warning">グラフの表示中にエラーが発生しました</div>';
-                    }
-                }
-            }
-            
-            {% if plots.prediction_plot %}
-            renderPlot('predictionPlot', {{ plots.prediction_plot|safe }});
-            {% endif %}
-            
-            {% if plots.residual_plot %}
-            renderPlot('residualPlot', {{ plots.residual_plot|safe }});
-            {% endif %}
-            
-            {% if plots.feature_importance_plot %}
-            renderPlot('featureImportancePlot', {{ plots.feature_importance_plot|safe }});
-            {% endif %}
-        });
-    </script>
-    {% endif %}
 </body>
 </html>

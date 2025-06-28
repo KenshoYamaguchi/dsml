@@ -6,6 +6,8 @@
 今回はLightGBM
 
 
+microsoft azureにホスティングするからそのためのファイルも作って
+
 
 インターフェース
 

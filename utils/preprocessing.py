@@ -52,15 +52,24 @@ class DataPreprocessor:
             for col in self.categorical_columns:
                 self.label_encoders[col] = LabelEncoder()
                 df_processed[col] = self.label_encoders[col].fit_transform(df_processed[col])
+                # Ensure encoded values are integers
+                df_processed[col] = df_processed[col].astype('int32')
         
         # Scale numeric features
         if self.numeric_columns:
             df_processed[self.numeric_columns] = self.numeric_scaler.fit_transform(
                 df_processed[self.numeric_columns]
             )
+            # Ensure numeric columns are float
+            df_processed[self.numeric_columns] = df_processed[self.numeric_columns].astype('float32')
         
         X = df_processed.drop(columns=[target_column])
         y = df_processed[target_column]
+        
+        # Debug: Check data types
+        print("データ型チェック（学習用）:")
+        for col in X.columns:
+            print(f"  {col}: {X[col].dtype}")
         
         return X, y
     
@@ -92,12 +101,21 @@ class DataPreprocessor:
                         df_processed[col] = df_processed[col].replace(list(unseen_values), most_frequent)
                     
                     df_processed[col] = self.label_encoders[col].transform(df_processed[col])
+                    # Ensure encoded values are integers
+                    df_processed[col] = df_processed[col].astype('int32')
         
         # Scale numeric features
         if self.numeric_columns:
             df_processed[self.numeric_columns] = self.numeric_scaler.transform(
                 df_processed[self.numeric_columns]
             )
+            # Ensure numeric columns are float
+            df_processed[self.numeric_columns] = df_processed[self.numeric_columns].astype('float32')
+        
+        # Debug: Check data types
+        print("データ型チェック（予測用）:")
+        for col in df_processed.columns:
+            print(f"  {col}: {df_processed[col].dtype}")
         
         return df_processed
     

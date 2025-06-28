@@ -130,7 +130,7 @@
                         <h5>予測値の分布</h5>
                     </div>
                     <div class="card-body">
-                        <div id="predictionDistPlot"></div>
+                        <img src="data:image/png;base64,{{ plots.prediction_distribution }}" class="img-fluid" alt="Prediction Distribution Plot">
                     </div>
                 </div>
             </div>
@@ -171,37 +171,5 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     
-    {% if prediction_complete and plots %}
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            {% if plots.prediction_distribution %}
-            try {
-                // Parse the plot data
-                let plotData;
-                const rawData = {{ plots.prediction_distribution|safe }};
-                
-                if (typeof rawData === 'string') {
-                    plotData = JSON.parse(rawData);
-                } else {
-                    plotData = rawData;
-                }
-                
-                // Create the plot with proper error handling
-                if (plotData && document.getElementById('predictionDistPlot')) {
-                    Plotly.newPlot('predictionDistPlot', plotData.data || plotData, 
-                                  plotData.layout || {responsive: true}, 
-                                  {responsive: true});
-                }
-            } catch (error) {
-                console.error('Error rendering prediction distribution plot:', error);
-                const plotDiv = document.getElementById('predictionDistPlot');
-                if (plotDiv) {
-                    plotDiv.innerHTML = '<div class="alert alert-warning">グラフの表示中にエラーが発生しました</div>';
-                }
-            }
-            {% endif %}
-        });
-    </script>
-    {% endif %}
 </body>
 </html>

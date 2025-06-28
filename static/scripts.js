@@ -68,28 +68,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     plotDiv.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
                 } else {
                     try {
-                        // Clear the div and plot the graph
+                        // Clear the div and display the base64 image
                         plotDiv.innerHTML = '';
                         
-                        // Parse the plot data - it should already be a proper Plotly object
-                        let plotData;
-                        if (typeof data.plot === 'string') {
-                            plotData = JSON.parse(data.plot);
-                        } else {
-                            plotData = data.plot;
-                        }
+                        // Create image element with base64 data
+                        const imgElement = document.createElement('img');
+                        imgElement.src = `data:image/png;base64,${data.plot}`;
+                        imgElement.className = 'img-fluid';
+                        imgElement.alt = 'Data Visualization';
+                        imgElement.style.maxWidth = '100%';
+                        imgElement.style.height = 'auto';
                         
-                        // Ensure we have the right structure for Plotly
-                        if (plotData.data && plotData.layout) {
-                            // Standard Plotly format with data and layout
-                            Plotly.newPlot('plotDiv', plotData.data, plotData.layout, {responsive: true});
-                        } else if (Array.isArray(plotData)) {
-                            // Data array only, use default layout
-                            Plotly.newPlot('plotDiv', plotData, {}, {responsive: true});
-                        } else {
-                            // Try to plot directly assuming it's a complete figure
-                            Plotly.newPlot('plotDiv', plotData, {}, {responsive: true});
-                        }
+                        plotDiv.appendChild(imgElement);
                     } catch (plotError) {
                         console.error('Plot rendering error:', plotError);
                         console.log('Plot data:', data.plot);

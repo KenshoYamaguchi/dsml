@@ -6,11 +6,9 @@ import matplotlib.pyplot as plt
 import japanize_matplotlib
 import shap
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-import plotly.graph_objects as go
-import plotly.express as px
-from plotly.subplots import make_subplots
 import base64
 from io import BytesIO
+import json
 
 class ModelEvaluator:
     def __init__(self, model, X_test, y_test, feature_names=None):
@@ -39,40 +37,34 @@ class ModelEvaluator:
         if self.predictions is None:
             self.predictions = self.model.predict(self.X_test)
         
-        fig = go.Figure()
-        
-        # Scatter plot of predictions vs actual
-        fig.add_trace(go.Scatter(
-            x=self.y_test,
-            y=self.predictions,
-            mode='markers',
-            name='Predictions',
-            marker=dict(
-                color='blue',
-                opacity=0.6
-            )
-        ))
-        
-        # Perfect prediction line
-        min_val = min(min(self.y_test), min(self.predictions))
-        max_val = max(max(self.y_test), max(self.predictions))
-        fig.add_trace(go.Scatter(
-            x=[min_val, max_val],
-            y=[min_val, max_val],
-            mode='lines',
-            name='Perfect Prediction',
-            line=dict(color='red', dash='dash')
-        ))
-        
-        fig.update_layout(
-            title='Predictions vs Actual Values',
-            xaxis_title='Actual Values',
-            yaxis_title='Predicted Values',
-            width=600,
-            height=500
-        )
-        
-        return fig
+        try:
+            plt.figure(figsize=(8, 5))
+            
+            # Scatter plot of predictions vs actual
+            plt.scatter(self.y_test, self.predictions, alpha=0.6, color='blue', label='Predictions')
+            
+            # Perfect prediction line
+            min_val = min(min(self.y_test), min(self.predictions))
+            max_val = max(max(self.y_test), max(self.predictions))
+            plt.plot([min_val, max_val], [min_val, max_val], 'r--', label='Perfect Prediction')
+            
+            plt.xlabel('Actual Values')
+            plt.ylabel('Predicted Values')
+            plt.title('Predictions vs Actual Values')
+            plt.legend()
+            plt.grid(True, alpha=0.3)
+            
+            # Convert to base64 for web display
+            buffer = BytesIO()
+            plt.savefig(buffer, format='png', bbox_inches='tight', dpi=150)
+            buffer.seek(0)
+            image_base64 = base64.b64encode(buffer.read()).decode()
+            plt.close()
+            
+            return image_base64
+        except Exception as e:
+            print(f"Prediction plot creation failed: {str(e)}")
+            return None
     
     def create_residual_plot(self):
         if self.predictions is None:
@@ -80,31 +72,32 @@ class ModelEvaluator:
         
         residuals = self.y_test - self.predictions
         
-        fig = go.Figure()
-        
-        fig.add_trace(go.Scatter(
-            x=self.predictions,
-            y=residuals,
-            mode='markers',
-            name='Residuals',
-            marker=dict(
-                color='green',
-                opacity=0.6
-            )
-        ))
-        
-        # Zero line
-        fig.add_hline(y=0, line_dash="dash", line_color="red")
-        
-        fig.update_layout(
-            title='Residual Plot',
-            xaxis_title='Predicted Values',
-            yaxis_title='Residuals',
-            width=600,
-            height=500
-        )
-        
-        return fig
+        try:
+            plt.figure(figsize=(8, 5))
+            
+            # Scatter plot of residuals
+            plt.scatter(self.predictions, residuals, alpha=0.6, color='green', label='Residuals')
+            
+            # Zero line
+            plt.axhline(y=0, color='red', linestyle='--', label='Zero Line')
+            
+            plt.xlabel('Predicted Values')
+            plt.ylabel('Residuals')
+            plt.title('Residual Plot')
+            plt.legend()
+            plt.grid(True, alpha=0.3)
+            
+            # Convert to base64 for web display
+            buffer = BytesIO()
+            plt.savefig(buffer, format='png', bbox_inches='tight', dpi=150)
+            buffer.seek(0)
+            image_base64 = base64.b64encode(buffer.read()).decode()
+            plt.close()
+            
+            return image_base64
+        except Exception as e:
+            print(f"Residual plot creation failed: {str(e)}")
+            return None
     
     def calculate_feature_importance(self):
         if hasattr(self.model, 'feature_importance'):
@@ -129,22 +122,29 @@ class ModelEvaluator:
     def create_feature_importance_plot(self):
         importance_df = self.calculate_feature_importance()
         
-        fig = go.Figure(go.Bar(
-            x=importance_df['importance'],
-            y=importance_df['feature'],
-            orientation='h',
-            marker_color='lightblue'
-        ))
-        
-        fig.update_layout(
-            title='Feature Importance',
-            xaxis_title='Importance',
-            yaxis_title='Features',
-            width=600,
-            height=max(400, len(importance_df) * 25)
-        )
-        
-        return fig
+        try:
+            plt.figure(figsize=(10, max(5, min(8, len(importance_df) * 0.25))))
+            
+            # Horizontal bar plot
+            plt.barh(importance_df['feature'], importance_df['importance'], color='lightblue')
+            
+            plt.xlabel('Importance')
+            plt.ylabel('Features')
+            plt.title('Feature Importance')
+            plt.grid(True, alpha=0.3)
+            plt.tight_layout()
+            
+            # Convert to base64 for web display
+            buffer = BytesIO()
+            plt.savefig(buffer, format='png', bbox_inches='tight', dpi=150)
+            buffer.seek(0)
+            image_base64 = base64.b64encode(buffer.read()).decode()
+            plt.close()
+            
+            return image_base64
+        except Exception as e:
+            print(f"Feature importance plot creation failed: {str(e)}")
+            return None
     
     def calculate_shap_values(self, sample_size=100):
         try:
@@ -217,7 +217,7 @@ class ModelEvaluator:
     def generate_evaluation_report(self):
         metrics = self.calculate_metrics()
         
-        # Create plots
+        # Create plots (all return base64 images now)
         prediction_plot = self.create_prediction_plot()
         residual_plot = self.create_residual_plot()
         feature_importance_plot = self.create_feature_importance_plot()

@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import japanize_matplotlib
 import base64
 from io import BytesIO
-import plotly.graph_objects as go
 from .preprocessing import DataPreprocessor
 from .lgb_train_model import LightGBMTrainer
 from .evaluate import ModelEvaluator
@@ -102,7 +101,7 @@ class PredictionService:
     
     def create_shap_summary_plot(self, shap_values, feature_names=None):
         try:
-            plt.figure(figsize=(10, 6))
+            plt.figure(figsize=(8, 5))
             
             # Set matplotlib backend to Agg for server environments
             import matplotlib
@@ -130,7 +129,7 @@ class PredictionService:
     
     def create_individual_shap_plot(self, shap_values, sample_index=0):
         try:
-            plt.figure(figsize=(10, 6))
+            plt.figure(figsize=(8, 5))
             
             # Set matplotlib backend to Agg for server environments
             import matplotlib
@@ -162,7 +161,7 @@ class PredictionService:
     
     def create_prediction_distribution_plot(self, predictions):
         try:
-            fig = go.Figure()
+            plt.figure(figsize=(8, 5))
             
             # Ensure predictions is a numpy array or list
             if hasattr(predictions, 'tolist'):
@@ -170,25 +169,23 @@ class PredictionService:
             else:
                 pred_values = list(predictions)
             
-            fig.add_trace(go.Histogram(
-                x=pred_values,
-                nbinsx=min(30, len(pred_values) // 2 + 1),  # Adjust bins based on data size
-                name='Prediction Distribution',
-                marker_color='lightblue',
-                opacity=0.7
-            ))
+            # Create histogram
+            plt.hist(pred_values, bins=min(30, len(pred_values) // 2 + 1), 
+                    color='lightblue', alpha=0.7, edgecolor='black')
             
-            fig.update_layout(
-                title='Distribution of Predictions',
-                xaxis_title='Predicted Values',
-                yaxis_title='Frequency',
-                width=800,
-                height=400,
-                showlegend=False,
-                margin=dict(l=50, r=50, t=50, b=50)
-            )
+            plt.xlabel('Predicted Values')
+            plt.ylabel('Frequency')
+            plt.title('Distribution of Predictions')
+            plt.grid(True, alpha=0.3)
             
-            return fig
+            # Convert to base64 for web display
+            buffer = BytesIO()
+            plt.savefig(buffer, format='png', bbox_inches='tight', dpi=150)
+            buffer.seek(0)
+            image_base64 = base64.b64encode(buffer.read()).decode()
+            plt.close()
+            
+            return image_base64
         except Exception as e:
             print(f"Prediction distribution plot creation failed: {str(e)}")
             import traceback

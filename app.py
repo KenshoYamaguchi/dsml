@@ -43,7 +43,51 @@ def analyze_page():
 def train_page():
     global current_data
     columns = current_data.columns.tolist() if current_data is not None else None
+    
+    # Check if there are saved training results in session
+    training_complete = session.get('training_complete', False)
+    if training_complete:
+        metrics = session.get('training_metrics')
+        plot_files = session.get('training_plot_files', {})
+        feature_importance = session.get('feature_importance')
+        
+        # Load plot images from files
+        plots = {}
+        import base64
+        for plot_name, filename in plot_files.items():
+            plot_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            if os.path.exists(plot_path):
+                with open(plot_path, 'rb') as f:
+                    plots[plot_name] = base64.b64encode(f.read()).decode()
+        
+        return render_template('train.html',
+                             columns=columns,
+                             training_complete=True,
+                             metrics=metrics,
+                             plots=plots,
+                             feature_importance=feature_importance)
+    
     return render_template('train.html', columns=columns)
+
+@app.route('/train/new')
+def new_train():
+    # Clean up old plot files
+    plot_files = session.get('training_plot_files', {})
+    for filename in plot_files.values():
+        plot_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        if os.path.exists(plot_path):
+            os.remove(plot_path)
+    
+    # Clear existing training results
+    session.pop('training_complete', None)
+    session.pop('training_metrics', None)
+    session.pop('training_plot_files', None)
+    session.pop('feature_importance', None)
+    session.pop('target_column', None)
+    session.pop('feature_columns', None)
+    session.pop('training_session_id', None)
+    
+    return redirect(url_for('train_page'))
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -71,6 +115,22 @@ def upload_file():
             # Store in session
             session['data_file'] = filepath
             
+            # Clean up old plot files when new data is uploaded
+            plot_files = session.get('training_plot_files', {})
+            for filename in plot_files.values():
+                plot_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                if os.path.exists(plot_path):
+                    os.remove(plot_path)
+            
+            # Clear any previous training results when new data is uploaded
+            session.pop('training_complete', None)
+            session.pop('training_metrics', None)
+            session.pop('training_plot_files', None)
+            session.pop('feature_importance', None)
+            session.pop('target_column', None)
+            session.pop('feature_columns', None)
+            session.pop('training_session_id', None)
+            
             # Get basic statistics
             stats = preprocessor_temp.get_basic_statistics(current_data)
             
@@ -93,48 +153,39 @@ def visualize_data():
     chart_type = request.json.get('chart_type', 'histogram')
     
     try:
-        import plotly.express as px
-        import plotly.graph_objects as go
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        import japanize_matplotlib
+        import base64
+        from io import BytesIO
+        
+        plt.figure(figsize=(6, 4))
         
         if chart_type == 'histogram':
             if current_data[column].dtype in ['object']:
                 # Categorical data - value counts
                 value_counts = current_data[column].value_counts().head(20)
-                fig = px.bar(x=value_counts.index, y=value_counts.values, 
-                           labels={'x': column, 'y': '頻度'}, 
-                           title=f'{column}の分布')
-                fig.update_layout(
-                    xaxis_title=column,
-                    yaxis_title='頻度',
-                    height=400,
-                    margin=dict(l=50, r=50, t=50, b=50)
-                )
+                plt.bar(range(len(value_counts)), value_counts.values, color='steelblue', alpha=0.7)
+                plt.xticks(range(len(value_counts)), value_counts.index, rotation=45)
+                plt.ylabel('頻度')
+                plt.title(f'{column}の分布')
             else:
                 # Numerical data - histogram
-                fig = px.histogram(current_data, x=column, nbins=30, title=f'{column}の分布')
-                # Set appropriate range based on data distribution
-                q1 = current_data[column].quantile(0.01)
-                q99 = current_data[column].quantile(0.99)
-                fig.update_layout(
-                    xaxis_title=column,
-                    yaxis_title='頻度',
-                    height=400,
-                    margin=dict(l=50, r=50, t=50, b=50),
-                    xaxis=dict(range=[q1, q99])
-                )
+                data_clean = current_data[column].dropna()
+                plt.hist(data_clean, bins=30, color='steelblue', alpha=0.7, edgecolor='black')
+                plt.xlabel(column)
+                plt.ylabel('頻度')
+                plt.title(f'{column}の分布')
             
         elif chart_type == 'box':
             if current_data[column].dtype not in ['object']:
-                fig = px.box(current_data, y=column, title=f'{column}の箱ひげ図')
-                # Set appropriate range based on data distribution
-                q1 = current_data[column].quantile(0.01)
-                q99 = current_data[column].quantile(0.99)
-                fig.update_layout(
-                    yaxis_title=column,
-                    height=400,
-                    margin=dict(l=50, r=50, t=50, b=50),
-                    yaxis=dict(range=[q1, q99])
-                )
+                data_clean = current_data[column].dropna()
+                plt.boxplot(data_clean, patch_artist=True, 
+                           boxprops=dict(facecolor='lightblue', alpha=0.7))
+                plt.ylabel(column)
+                plt.title(f'{column}の箱ひげ図')
+                plt.xticks([1], [column])
             else:
                 return jsonify({'error': 'カテゴリカルデータには箱ひげ図は使用できません'})
         
@@ -142,56 +193,53 @@ def visualize_data():
             x_column = request.json.get('x_column')
             y_column = request.json.get('y_column')
             if x_column and y_column:
-                fig = px.scatter(current_data, x=x_column, y=y_column, 
-                               title=f'{x_column} vs {y_column}')
-                fig.update_layout(
-                    xaxis_title=x_column,
-                    yaxis_title=y_column,
-                    height=400,
-                    margin=dict(l=50, r=50, t=50, b=50)
-                )
+                plt.scatter(current_data[x_column], current_data[y_column], 
+                           alpha=0.6, color='steelblue', s=30)
+                plt.xlabel(x_column)
+                plt.ylabel(y_column)
+                plt.title(f'{x_column} vs {y_column}')
             else:
                 return jsonify({'error': 'X軸とY軸の列を指定してください'})
         
         elif chart_type == 'line':
             if current_data[column].dtype not in ['object']:
-                fig = px.line(x=current_data.index, y=current_data[column], 
-                             title=f'{column}の時系列プロット')
-                fig.update_layout(
-                    xaxis_title='インデックス',
-                    yaxis_title=column,
-                    height=400,
-                    margin=dict(l=50, r=50, t=50, b=50)
-                )
+                plt.plot(current_data.index, current_data[column], 
+                        color='steelblue', linewidth=2)
+                plt.xlabel('インデックス')
+                plt.ylabel(column)
+                plt.title(f'{column}の時系列プロット')
             else:
                 return jsonify({'error': 'カテゴリカルデータには線グラフは使用できません'})
         
         elif chart_type == 'violin':
             if current_data[column].dtype not in ['object']:
-                fig = px.violin(current_data, y=column, title=f'{column}のバイオリンプロット')
-                fig.update_layout(
-                    yaxis_title=column,
-                    height=400,
-                    margin=dict(l=50, r=50, t=50, b=50)
-                )
+                data_clean = current_data[column].dropna()
+                parts = plt.violinplot([data_clean], positions=[1], showmeans=True)
+                for pc in parts['bodies']:
+                    pc.set_facecolor('lightblue')
+                    pc.set_alpha(0.7)
+                plt.ylabel(column)
+                plt.title(f'{column}のバイオリンプロット')
+                plt.xticks([1], [column])
             else:
                 return jsonify({'error': 'カテゴリカルデータにはバイオリンプロットは使用できません'})
         
-        # Convert to JSON using Plotly's to_json method for better compatibility
-        try:
-            graphJSON = fig.to_json()
-            return jsonify({'plot': graphJSON})
-        except Exception as json_error:
-            print(f"JSON encoding error: {str(json_error)}")
-            # Fallback to old method
-            try:
-                graphJSON = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
-                return jsonify({'plot': graphJSON})
-            except Exception as fallback_error:
-                print(f"Fallback JSON encoding error: {str(fallback_error)}")
-                return jsonify({'error': f'グラフのJSON変換に失敗しました: {str(fallback_error)}'})
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        
+        # Convert to base64 for web display
+        buffer = BytesIO()
+        plt.savefig(buffer, format='png', bbox_inches='tight', dpi=150, 
+                   facecolor='white', edgecolor='none')
+        buffer.seek(0)
+        image_base64 = base64.b64encode(buffer.read()).decode()
+        plt.close()
+        
+        return jsonify({'plot': image_base64})
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': f'可視化に失敗しました: {str(e)}'})
 
 @app.route('/train', methods=['POST'])
@@ -230,30 +278,40 @@ def train_model():
         evaluator = ModelEvaluator(model, X_test, y_test, feature_names=X.columns.tolist())
         evaluation_report = evaluator.generate_evaluation_report()
         
-        # Convert plots to JSON for frontend
-        plots_json = {}
-        for plot_name, plot_obj in evaluation_report['plots'].items():
-            if plot_obj is not None:
-                if hasattr(plot_obj, 'to_json'):
-                    try:
-                        plots_json[plot_name] = plot_obj.to_json()
-                    except Exception as json_error:
-                        print(f"Error converting {plot_name} to JSON: {str(json_error)}")
-                        try:
-                            plots_json[plot_name] = json.dumps(plot_obj, cls=plotly.utils.PlotlyJSONEncoder)
-                        except Exception as fallback_error:
-                            print(f"Fallback error for {plot_name}: {str(fallback_error)}")
-                            plots_json[plot_name] = None
-                elif isinstance(plot_obj, str):  # Base64 image
-                    plots_json[plot_name] = plot_obj
-                else:
-                    plots_json[plot_name] = None
+        # Save plots to files instead of session
+        plots_json = evaluation_report['plots']
+        feature_importance_data = evaluator.calculate_feature_importance().to_dict('records')
+        
+        # Save plot images to temporary files
+        import uuid
+        session_id = session.get('training_session_id', str(uuid.uuid4()))
+        session['training_session_id'] = session_id
+        
+        plot_files = {}
+        for plot_name, plot_data in plots_json.items():
+            if plot_data:
+                plot_filename = f"plot_{session_id}_{plot_name}.png"
+                plot_path = os.path.join(app.config['UPLOAD_FOLDER'], plot_filename)
+                
+                # Save base64 image to file
+                import base64
+                with open(plot_path, 'wb') as f:
+                    f.write(base64.b64decode(plot_data))
+                plot_files[plot_name] = plot_filename
+        
+        # Save training results to session (lightweight data only)
+        session['training_complete'] = True
+        session['training_metrics'] = evaluation_report['metrics']
+        session['training_plot_files'] = plot_files
+        session['feature_importance'] = feature_importance_data
+        session['target_column'] = target_column
+        session['feature_columns'] = feature_columns
         
         return render_template('train.html',
                              training_complete=True,
                              metrics=evaluation_report['metrics'],
                              plots=plots_json,
-                             feature_importance=evaluator.calculate_feature_importance().to_dict('records'))
+                             feature_importance=feature_importance_data)
         
     except Exception as e:
         flash(f'モデル学習に失敗しました: {str(e)}')
@@ -286,24 +344,8 @@ def predict():
             # Generate predictions
             prediction_report = prediction_service.generate_prediction_report(file_path=filepath)
             
-            # Convert plots to JSON for frontend
-            plots_json = {}
-            for plot_name, plot_obj in prediction_report['plots'].items():
-                if plot_obj is not None:
-                    if hasattr(plot_obj, 'to_json'):
-                        try:
-                            plots_json[plot_name] = plot_obj.to_json()
-                        except Exception as json_error:
-                            print(f"Error converting {plot_name} to JSON: {str(json_error)}")
-                            try:
-                                plots_json[plot_name] = json.dumps(plot_obj, cls=plotly.utils.PlotlyJSONEncoder)
-                            except Exception as fallback_error:
-                                print(f"Fallback error for {plot_name}: {str(fallback_error)}")
-                                plots_json[plot_name] = None
-                    elif isinstance(plot_obj, str):  # Base64 image
-                        plots_json[plot_name] = plot_obj
-                    else:
-                        plots_json[plot_name] = None
+            # All plots are now base64 strings from matplotlib
+            plots_json = prediction_report['plots']
             
             return render_template('predict.html',
                                  prediction_complete=True,
