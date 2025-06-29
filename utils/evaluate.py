@@ -10,6 +10,9 @@ import base64
 from io import BytesIO
 import json
 
+# 関連クラス: LightGBMTrainer, PredictionService
+# 目的: モデルの評価指標算出、特徴重要度解析、SHAP値を使った解釈性分析、視覚化
+# 機能: RMSE/MAE/R2算出、予測・残差プロット、特徴重要度プロット、SHAPサマリー・ウォーターフォールプロット
 class ModelEvaluator:
     def __init__(self, model, X_test, y_test, feature_names=None):
         self.model = model

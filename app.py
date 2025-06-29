@@ -12,6 +12,10 @@ from utils.lgb_train_model import LightGBMTrainer
 from utils.evaluate import ModelEvaluator
 from utils.predict import PredictionService
 
+# 関連クラス: Config, DataPreprocessor, LightGBMTrainer, ModelEvaluator, PredictionService
+# 目的: Flaskアプリケーションのメインエントリポイント、ルーティング、セッション管理、アップロード処理
+# 機能: データアップロード、データ分析・可視化、モデル学習、予測実行、結果表示の各種エンドポイント提供
+
 app = Flask(__name__)
 Config.init_app(app)
 

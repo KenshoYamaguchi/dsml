@@ -1,5 +1,8 @@
 import os
 
+# 関連クラス: DataPreprocessor, LightGBMTrainer, ModelEvaluator, PredictionService
+# 目的: アプリケーション全体の設定管理と環境変数の統一管理
+# 機能: ファイルアップロード設定、モデル保存パス、Azure設定、データ処理パラメータ等
 class Config:
     # Base directory
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))

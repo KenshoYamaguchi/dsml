@@ -5,6 +5,9 @@ from sklearn.metrics import mean_squared_error
 import joblib
 import os
 
+# 関連クラス: DataPreprocessor, ModelEvaluator, Config
+# 目的: LightGBMモデルの訓練、ハイパーパラメーターチューニング、モデルの保存・読み込み
+# 機能: パラメーターグリッド管理、RandomizedSearchCV、早期停止、特徴重要度算出、モデル評価
 class LightGBMTrainer:
     def __init__(self):
         self.model = None

@@ -11,6 +11,9 @@ from .preprocessing import DataPreprocessor
 from .lgb_train_model import LightGBMTrainer
 from .evaluate import ModelEvaluator
 
+# 関連クラス: DataPreprocessor, LightGBMTrainer, ModelEvaluator, Config
+# 目的: 学習済みモデルを使用した新しいデータの予測、SHAP解析、予測結果の視覚化とレポート生成
+# 機能: ファイル・DataFrame予測、SHAP説明生成、予測分布・個別SHAP・サマリープロット作成、予測レポート生成
 class PredictionService:
     def __init__(self, model_path=None, preprocessor_path=None):
         self.model = None

@@ -4,6 +4,9 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.impute import SimpleImputer
 
+# 関連クラス: Config, LightGBMTrainer, PredictionService
+# 目的: データの前処理、スケーリング、エンコーディング、缠値処理を統一管理
+# 機能: CSV/Excelファイル読み込み、数値・カテゴリカルデータ処理、データ分割、統計情報算出
 class DataPreprocessor:
     def __init__(self):
         self.numeric_scaler = StandardScaler()
